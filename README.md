@@ -10,7 +10,7 @@ of glass (detailed in the Group variable in the data set). To cluster the data, 
 - Hierarchical Clustering
 - K-means Clustering
 
-## Metric Scaling
+## Binary Data Clustering
 Ireland is a parliamentary democracy. The National Parliament (the Oireachtas) consists of the President
 and two Houses: Dáil Éireann (House of Representatives) and Seanad Éireann (the Senate). The members of
 Dail Éireann, called Teachtaí Dála (TDs), are directly elected by the people. More information may be found

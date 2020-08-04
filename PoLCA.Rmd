@@ -1,0 +1,186 @@
+---
+title: "PoLCA - Clustering Binary Data"
+author: "Eveline Surbakti - 19200629"
+date: "3/31/2020"
+output: html_document
+---
+
+### 1 (a) Hierarchical method to cluster the TDs based on binary data.
+```{r}
+#load bin.votes (the voting data)
+load("32ndDail_FifthSession_BinaryVotes.Rdata")
+
+#load the data of TDs
+parties<-read.csv("TDs_names_parties.csv",row.names = 1)
+
+#make it 0 and 1
+votes<-bin.votes-1
+```
+In hierarchical clustering procedure, the first thing to be done after loaded the data is setting the distance measurement.
+```{r}
+#load the libraries
+library(ggplot2)    # ggplot
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+#use binary method to treat binary data
+distance<-dist(votes[1:6],method="binary") 
+```
+Next, I decided to not use single linkage for this clustering due to the chaining effect. With two options left (Average and Complete), I will use average since it takes all the pairs of points, compute their similarities and then calculate the average of the similarities. 
+
+I always start with the smaller number of clustering. So, after using the hierarchical clustering function, I plot it in dendogram, analyze the prospectus number of clusters and cut it, here I found 2 clusters. Then, I made another cut with 3 clusters to compare them.
+```{r}
+#running the hclust to make hierarchical clustering
+average <- hclust(distance, method = 'average')
+
+#cut the average dendogram into 2 and 3 clusters
+cut_average2 <- cutree(average, k = 2)
+cut_average3 <- cutree(average, k = 3)
+
+#plot the dendogram with the cut of 2 and 3 clusters
+avg_dendo <- as.dendrogram(average)
+
+par(mfrow=c(1,2))
+plot(avg_dendo,main="H-2 Clustering")
+rect.hclust(average, k = 2)
+plot(avg_dendo,main="H-3 Clustering")
+rect.hclust(average, k = 3)
+```
+
+
+```{r}
+#show the number of observations for 2 clusters
+a2<-table(cut_average2) 
+a2
+```
+With 2 clusters, we have a largest cluster with 146 members.
+```{r}
+#show the number of observations for 3 clusters
+a3<-table(cut_average3)
+a3
+```
+Then, with 3 clusters, the largest cluster is getting smaller with 100 members. Now, let's see the optimal clusters by elbow and silhoutte method.
+```{r}
+#show the optimal number of clusters
+fviz_nbclust(votes, FUN = hcut, method = "wss")
+fviz_nbclust(votes, FUN = hcut, method = "silhouette")
+```
+
+Based on both graphs, the clustering results with 2 clusters is better than the rest. Because in each graph, there is significant differente between 1 and 2 number of clusters.
+
+### 1 (b) PoLCA function to cluster the TDs based on their voting data.
+Latent class analysis (LCA) can be thought of as a model-based approach to clustering when the recorded data are binary in nature. Polytomous latent class analysis (poLCA) is a clustering method which can be used when variables are categorical.
+
+```{r}
+library(poLCA)
+library(dplyr)
+# models with different number of groups without covariates
+f <-cbind(Environment,RentFreeze,SocialWelfare,GamingAndLotteries,HousingMinister,FirstTimeBuyers) ~ 1
+
+# set seed to keep the same result
+set.seed(123)
+lc1<-poLCA(f, data=bin.votes, nclass=1) 
+lc2<-poLCA(f, data=bin.votes, nclass=2)
+lc3<-poLCA(f, data=bin.votes, nclass=3)
+lc4<-poLCA(f, data=bin.votes, nclass=4) 
+lc5<-poLCA(f, data=bin.votes, nclass=5)
+lc6<-poLCA(f, data=bin.votes, nclass=6)
+
+#store the result to compare the BIC and AIC
+results <- data.frame(Model=c("Model"))
+
+results$Model<-as.integer(results$Model)
+results[2,1]<-c("Model 2")
+results[3,1]<-c("Model 3")
+results[4,1]<-c("Model 4")
+results[5,1]<-c("Model 5")
+results[6,1]<-c("Model 6")
+
+results[2,2]<-lc2$bic
+results[3,2]<-lc3$bic
+results[4,2]<-lc4$bic
+results[5,2]<-lc5$bic
+results[6,2]<-lc6$bic
+
+results[2,3]<-lc2$aic
+results[3,3]<-lc3$aic
+results[4,3]<-lc4$aic
+results[5,3]<-lc5$aic
+results[6,3]<-lc6$aic
+```
+
+Now, I will summarize the result of BIC and AIC into a table. 
+The two most widely used parsimony measures are the Bayesian information criterion, or BIC (Schwartz 1978) and Akaike information criterion, or AIC (Akaike 1973). Preferred models are those that minimize values of the BIC and/or AIC.
+```{r}
+#combining results to a dataframe
+colnames(results)<-c("Model","BIC","AIC")
+lca_results<-results[-1,] #we do not need the first row
+lca_results
+```
+In this case, model with 2 clusters has the lowest BIC and the model with 4 clusters has the lowest AIC.
+
+In general, it might be best to use AIC and BIC together in model selection. Here, in selecting the number of latent classes in a model, if BIC points to a two-class model and AIC points to a four-class model, it makes sense to select from models with 2, 3 and 4 latent classes. I choose a model with two clusters (Occam's razor).
+
+### 1 (c) Compare the clustering from the polytomous analysis to the clustering obtained by cutting the dendrogram you view as optimal from (a).
+
+```{r}
+# joining the result of poLCA
+vote<-merge(parties,bin.votes,by="row.names",all=TRUE)
+lcnew<-as.data.frame(lc2$predclass)
+join<-cbind(vote,lcnew)
+vote<-merge(parties,votes,by="row.names",all=TRUE)
+
+#print the result from part(a)
+```
+I will start the comparison by matching both classes. In part (a), hierarchical clustering with average method gave me 2 clusters and poLCA also gave me 2 clusters. Here is the result from part(a) for hierarchical. I printed the output for the cluster with 10 members and did further investigation on its membership. 
+```{r}
+a2
+```
+```{r}
+join %>% 
+  filter(Environment=="1") %>% 
+  filter(RentFreeze=="1") %>% 
+  filter(SocialWelfare=="1") %>% 
+  filter(GamingAndLotteries=="1") %>% 
+  filter(HousingMinister=="1") %>% 
+  filter(FirstTimeBuyers=="1")
+```
+After further analysis about the data for this cluster, all of ten TDs had the same idea and voted YES about all the topics, regardless of their party. It is the behaviour of hierarchical clustering method to generate the cluster based on this similarity, even more when the data is binary.
+
+Now, compare to the result from polCA: 
+Cluster 1 has 56 members while Cluster 2 has 100 members.
+PoLCA detect the other pattern for clustering that completely different with what hierarchical did. 
+
+```{r}
+library(tidyverse)
+library(hrbrthemes)
+library(viridis)
+library(plotly)
+
+dataframe_lc2<-as.data.frame(lc2$probs)
+
+# Load data 
+data2 <- read.table("lca2.csv", header=T, sep=",")
+
+#I replace this output with Tableau plots for prettier and easier analysis
+
+#install.packages("dendextend")
+library(heatmaply)
+p2 <- heatmaply(data2[,-1],
+        dendrogram = "none",
+        xlab = "", ylab = "", 
+        main = "",
+        margins = c(60,100,40,20),
+        grid_color = "white",
+        grid_width = 0.00001
+        )
+
+p2
+```
+
+The heatmap shows the clusters are formed based on the clear dissimilarities. Members in cluster 2 give probability of YES closer or equal to 1.00 to RentFreeze, SocialWelfare, HousingMinister and FirstTimeBuyers topics, while the members in cluster 1 give probability of YES closer or equal to 1.00 to Environment topic. 
+
+
+```{r}
+lc2<-poLCA(f, data=bin.votes, nclass=2,graphs = TRUE)
+```

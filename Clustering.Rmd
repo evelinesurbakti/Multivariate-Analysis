@@ -1,0 +1,527 @@
+---
+title: "Multivariate Analysis"
+author: "Eveline Surbakti"
+date: "2/29/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+The Glass.csv dataset examines the chemical compositions of 15th-17th century archaeological glass vessels excavated in Antwerp. The data record the concentrations of 13 elements,
+determined by x-ray methods, in 180 glass vessels. The data consist of measurements on four different types of glass. 
+
+```{r, include - FALSE}
+data1 <- read.csv("Glass.csv")
+set.seed(19200629) #to set the seed to the student number
+W<-sample(1:nrow(data1),1) #store my random seed to a variable
+data1_mod <- data1[-W,] #my data after remove the random observation
+```
+### 1 (a) (i) Compute the correlation matrix R of the 13 chemical elements 
+
+```{r}
+cor1 <- cor(data1_mod) #calculation with cor function in R
+
+S <- cov(data1_mod) #S is sample covariance matrix
+D1 <- diag(S) #take the diagonal
+D <- diag(1/sqrt(D1)) #D^-1/2 is a diagonal matrix with the inverse of each variable's standard deviation of diagonal
+
+cor2 <- D%*%S%*%D #manual computation of correlation in R
+
+round(cor1,2) == round(cor2,2)
+#Ensure the calculation is correct by showing that the result of cor2 and that computed by the cor function in R (cor1) are equal. I use round function to make sure the precision will not affect the equation. 
+```
+
+### 1 (a) (ii) Using R, here is the first two eigenvalues and eigenvectors of the covariance matrix S. 
+```{r}
+#use eigen function into covariance matrix S
+res<-eigen(S)
+#the eigenvalues
+Eigval1<-res$values[1]
+Eigval2<-res$values[2]
+```
+
+The first eigenvalue
+```{r}
+Eigval1
+```
+The second eigenvalue
+```{r}
+Eigval2
+```
+
+```{r}
+#the eigenvectors
+Eigvec1<-res$vectors[,1]
+Eigvec2<-res$vectors[,2]
+```
+The first eigenvector
+```{r}
+Eigvec1
+```
+The second eigenvector
+```{r}
+Eigvec2
+```
+They are indeed eigenvalues and eigenvectors of S by following calculation.
+```{r}
+#Sv = Av, 
+#A is the eigenvalue
+#v is the eigenvector
+
+#Reproof the first Eigenvalue and Eigenvector of matrix S
+round(S%*%Eigvec1) == round(Eigval1*Eigvec1)
+```
+
+```{r}
+#Reproof the second Eigenvalue and Eigenvector of matrix S
+round(S%*%Eigvec2) == round(Eigval2*Eigvec2)
+```
+
+### 1 (a) (iii) Using R, here is the verification that the first two eigenvectors are orthonormal.
+
+Orthonormal means that the first two eigenvectors are both normalized and orthogonal.
+
+```{r}
+t(Eigvec1)%*%Eigvec1
+```
+The result is the same with the eigenvector 2.
+```{r}
+t(Eigvec2)%*%Eigvec2
+```
+
+orthogonal - 2 vectors are orthogonal if they are perpendicular to each other. In other words, the dot product of the two vectors is zero.
+```{r}
+round(t(Eigvec1)%*%Eigvec2)
+```
+The result is the same with the eigenvector 2.
+```{r}
+round(t(Eigvec2)%*%Eigvec1)
+```
+
+### 1 (a) (iv) After the calculation of variance of each element I would recommend to standardize the glass data prior to analysis. 
+```{r}
+# Examine the data by looking at the first few rows.
+colnames(data1_mod)
+# Extract the numerical variables of interest to a new matrix.
+dat = data1_mod[,2:14]
+# calculate the variance 
+variance1=apply(dat,2,var)
+# plot the variance
+plot(variance1,main = "Variance of each Element", type="l", ylab="variance", xlab="element")
+```
+
+Data standardization is important to make sure that the data is internally consistent. The element with greater variance will give have a greater effect on analysis. Furthermore, every element has an unique atomic mass. The unit for each standardized values are useful for tracking data that isn't easy to compare, that is why this data need a standardization.
+
+```{r}
+StDev = apply(dat, 2, sd) #find the std deviation
+stddat = sweep(dat, 2, StDev, "/") #standardize the data
+# plot the variance after standardization
+plot(apply(stddat,2,var),main = "Standardized Variance of each Element", type="l", ylab="variance", xlab="element")
+```
+
+now, the variance for every element after standardization is 1. 
+
+```{r,include=FALSE}
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra)
+library(e1071)
+library(GGally)
+
+```
+
+### 2 (a) Cluster the glass vessels using k-means clustering. 
+
+In K-means clustering procedure, first, I have to specify the number of clusters (K) to be created and also select randomly the initial cluster centers, here I put 35 to get a stable result.
+
+Next, (we call this as iteration process) each observation is assigned to the closest centroid, based on the Euclidean distance between the object and the centroid. Then R will update the cluster centroid by calculating the new mean values of all the data points in the cluster until the cluster assignments stop changing. 
+
+R will help to do the rest of iterations to minimize the total within sum of square, 10 iterations as the default of maximum number of iterations.
+
+```{r}
+# Compute k-means with k = 2
+set.seed(19200629)
+K <- 2 #set number of the cluster
+cl2 <- kmeans(stddat, center= K, nstart = 35) #kmeans with center of K and 35 initial centers
+table(cl2$cluster) #generate the table for clusters
+```
+We have 159 observations in the first cluster and 20 observations in the second cluster. 
+
+Here, we can see the plot of the data based on the result of clustering.
+```{r}
+#symbol for each member in clusters
+symb <- c(1,2,3,4) 
+#colors
+col <- c("darkmagenta", "royalblue2","lightcoral","springgreen3") 
+# plot with symbol and color corresponding to the clusterings
+pairs(stddat[,], gap = 0, pch = symb[cl2$cluster],col = adjustcolor(col[cl2$cluster], 0.5), main = "Clustering result - K = 2")
+```
+
+Magenta colors for the first cluster and blue for the second cluster. 
+The first cluster looks dominate every plots. Next, is the cluster plot.
+```{r}
+#vizualization of clusters
+fviz_cluster(cl2, data = stddat)
+```
+
+To validate the number of clusters, I use total within sum of square (wss) method, where the purpose of method is trying to minimize the total wss for each number of clusters. Here is the result:
+```{r}
+#plot the total wss vs the number of clusters
+fviz_nbclust(stddat, kmeans, method = "wss")
+```
+
+Using wss method, there are 2 possibilities number of clusters they are 2 and 4 clusters. But, it is clear that the line from number of cluster 1 to number of cluster 2 is steeper. The decrease of total within sum of square is very significant compare to others. 
+
+I also used Silhouette method below and plot them; the best result is 2 clusters. 
+
+```{r}
+fviz_nbclust(stddat, kmeans, method = "silhouette")
+```
+
+```{r}
+table(data1_mod$Group, cl2$cluster)
+```
+
+From the table above, we can see the partitions of 4 groups and clustering results. Observations of group 1 and 2 are located in the first cluster and the rest in the second cluster. 
+
+By using K-means clustering method, I would like to recommend 2 clusters for the dataset. 
+
+### 2 (b) Cluster the glass vessels using hierarchical clustering.
+In hierarchical clustering procedure, the first thing to be done is import the data, and then set the distance measurement, I choosed Euclidean because it is one of the most used distance metric.
+
+```{r, include=FALSE}
+suppressPackageStartupMessages(library(dendextend))
+distance <- dist(stddat, method = 'euclidean')
+```
+
+Next, I decided to not use single linkage for this clustering due to the chaining effect. With two options left (Average and Complete), I will use average since it takes all the pairs of points, compute their similarities and then calculate the average of the similarities. 
+
+I always start with the smaller number of clustering. So, after using the hierarchical clustering function, I plot it in dendogram, analyze the prospectus number of clusters and cut it, here I found 2 clusters. I made another variable with 3 clusters cut to compare them.  
+
+```{r}
+#running the hclust to make hierarchical clustering
+average <- hclust(distance, method = 'average')
+#cut the average dendogram into 2 and 3 clusters
+cut_average <- cutree(average, k = 2)
+cut_average3 <- cutree(average, k = 3)
+#plot the dendogram with the cut of 2 clusters
+avg_dendo <- as.dendrogram(average)
+avg_col_dend <- color_branches(avg_dendo, h = 8)
+plot(avg_col_dend,main="H-2 Clustering")
+rect.hclust(average, k = 2)
+```
+```{r}
+#show the number of observations for every cluster
+table(cut_average) 
+```
+
+Below is the plot for 3 clusters, the quantity of new additional cluster is small.
+```{r}
+#plot the dendogram with the cut of 3 clusters
+avg_dendo <- as.dendrogram(average)
+avg_col_dend <- color_branches(avg_dendo, h = 6)
+plot(avg_col_dend,main="H-3 Clustering")
+rect.hclust(average, k = 3)
+```
+```{r}
+#show the number of observations for every cluster
+table(cut_average3)
+```
+It seems that the observations from the second cluster in the first cut spread among cluster 2 and 3 in the current dendogram. In my opinion based on the dendogram, by using hierarchical clustering, the first clustering result with 2 number of clusters is better than the last one. 
+
+### 2 (c) Here is the cross tabulation of the cluster solutions obtained in (a) and (b).
+```{r, include = FALSE}
+library(e1071)
+tab <- table(cut_average, cl2$cluster)
+tab
+```
+I will use classAgreement function to compare both results.
+```{r}
+classAgreement(tab)
+```
+Looking at the adjustment of Rand Index, we have 100% of agreement between both of methods. I think this could happen because both methods are using the same distance method which is Euclidean.
+
+### 2 (d) Create a pairs plot of the data, highlighting vessels from different glass types using colour and/or plotting characters. 
+
+```{r}
+#pairs plot
+pairs(stddat, gap = 0, pch = symb[data1_mod$Group], col = adjustcolor(col[data1_mod$Group], 1), main = "Cluster based on Group")
+```
+```{r}
+#ggpairs(data1_mod,aes(colour = factor(Group), alpha = 0.4)) Not printing because of the error
+```
+
+Comment on the relative size of the first glass type group 
+The Group 1 has the extremely large size of observations. This can mislead the clustering tools. For instance in k-means, the initial centers are taken from observations randomly. With the relative size as large as Group 1 (even it has more than ten folds size of other groups), the probability of the observation in group 1 to be picked as the centers is significantly higher than any other observations. Then the iterations will update the observations closer to those centers.
+
+```{r}
+table(data1_mod[,1])
+```
+
+Comment on the distribution of the PbO variable. 
+The distribution is skewed and not normally distributed.
+```{r}
+skewness(stddat$PbO) #checking the skewness
+```
+This value implies that the distribution of the data is significantly skewed to the right or positively skewed. We can see from the pairs plot that the points are scattered with 'L' shape.
+
+Here is the plot:
+```{r}
+pbo <- stddat$PbO 
+#plot the histogram
+h<-hist(pbo, breaks=6, col="springgreen3",main="Histogram")
+```
+
+Non normally distributed data can mislead the statistical decision. In my opinion, the PbO element data should be transformed to fix this problem. 
+
+#Explore the impact of removing these data from your analysis. Why would detecting such issues be challenging in a truly unsupervised and high-dimensional setting?
+1. With a high-dimensional data, the visualization is challenging. With 13 elements, we might be able to detect this within the pairs plot. But, if we have hundreds and more, it might be harder to visualize. 
+
+2. There is a curse of dimensionality, where we hope that we can get more information from the data features but actually they are too much so we could not get the important latent features.
+
+3. Related to k-means and hierarchical methods where we use distance as the tool, the concept of distance becomes less precise as the number of dimensions grows, the distance between any two points in a given dataset converges. The discrimination of the nearest and farthest point in particular becomes meaningless.
+
+4. There is a likelihood that some features are correlated. 
+
+I removed those data and try to cluster the new data with k-means.
+```{r}
+#removing observation with Group 1
+removegroup1<-data1_mod[!(data1_mod$Group=="1"),]
+#removing PbO from the data
+removepbo<-removegroup1[,-13]
+#find the std deviation
+StDevremovepbo = apply(removepbo, 2, sd) 
+#standardize the data
+stdremovepbo = sweep(removepbo, 2, StDev, "/") 
+
+#fit into kmeans with
+removepbofit2 <- kmeans(stdremovepbo, centers = 2, nstart = 35)
+fviz_nbclust(stdremovepbo, kmeans, method = "wss")
+```
+```{r}
+fviz_cluster(removepbofit2, data = stdremovepbo)
+```
+```{r}
+table(removepbo$Group, removepbofit2$cluster)
+```
+The final analysis result is totally different with the previous one. There is no further description about the types of glass, but based on the data, I think both type 3 and 4 are having similar features to make them stay in the same cluster. 
+
+#3. Measurements of Forensic Glass Fragments Dataset
+The fgl data frame has 214 rows and 10 columns. It was collected by B. German on fragments of glass collected in forensic work.
+
+I think from the data, since RI (refractive index) is a ratio and the 8 measurements are percentage by weight of oxides, standardization is not neccessary.   
+
+In this section, I will calculate the misclassification error for linear discriminant analysis applied to the first 9 variables in this dataset, using the final variable as the known class. I split the data such that floor(n*(2/3)) observations are in the training set and the remainder in the test set, the function compute the misclassification rate, and repeat this 100 times.
+
+```{r, include=FALSE}
+library(MASS) # Load the MASS library in R, and its fgl dataset
+data("fgl")
+set.seed(19200629)
+FOR_FGL<-sample(1:nrow(fgl),1)
+finaldata <- fgl[-FOR_FGL,]
+```
+
+```{r}
+table(fgl$type) #count the observations in each type
+TOT <- nrow(finaldata) #number of row
+```
+
+```{r}
+G <- length(levels(finaldata$type))
+#Split the data such that floor(n*(2/3)) observations are in the training set
+TR=floor(TOT*(2/3))
+
+mylda <- function(x, prior, mu, covar){
+  x <- matrix(as.numeric(x), ncol=1)
+  log(prior) - (0.5*t(mu)%*%solve(covar)%*%mu) + (t(x)%*%solve(covar)%*%mu)}
+
+# compute the misclassification rate, and repeat 100 times. 
+Rep=100
+missclass <- rep(0, Rep)
+missclass_type1 <- rep(0, Rep)
+missclass_type2 <- rep(0, Rep)
+missclass_type3 <- rep(0, Rep)
+missclass_type4 <- rep(0, Rep)
+missclass_type5 <- rep(0, Rep)
+missclass_type6 <- rep(0, Rep)
+
+# Here is the function to calculate the misclassification error for linear discriminant analysis applied to the first 9 variables in this dataset
+
+for (i in 1:Rep) {
+  # set training and test data
+  train.index <- sample(1:TOT, TR)
+  train <- finaldata[train.index,]
+  
+  # the remainder in the test set
+  test.index <- setdiff(1:TOT, train.index)
+  test<-finaldata[test.index,]
+  
+  # final variable as the known class
+  type_1 <- subset(train, type == "WinF")
+  type_2 <- subset(train, type == "WinNF")
+  type_3 <- subset(train, type == "Veh")
+  type_4 <- subset(train, type == "Con")
+  type_5 <- subset(train, type == "Tabl")
+  type_6 <- subset(train, type == "Head")
+  
+  mymu1 <- apply(type_1[1:9],2,mean)
+  mymu2 <- apply(type_2[1:9],2,mean)
+  mymu3 <- apply(type_3[1:9],2,mean)
+  mymu4 <- apply(type_4[1:9],2,mean)
+  mymu5 <- apply(type_5[1:9],2,mean)
+  mymu6 <- apply(type_6[1:9],2,mean)
+  
+  mymu<-rbind(mymu1,mymu2,mymu3,mymu4,mymu5,mymu6)
+  
+  cov_1 <- cov(type_1[,1:9])
+  cov_2 <- cov(type_2[,1:9])
+  cov_3 <- cov(type_3[,1:9])
+  cov_4 <- cov(type_4[,1:9])
+  cov_5 <- cov(type_5[,1:9])
+  cov_6 <- cov(type_6[,1:9])
+  cov_all<-((cov_1*(nrow(type_1)-1)) + (cov_2*(nrow(type_2)-1)) + (cov_3*(nrow(type_3)-1)) + (cov_4*(nrow(type_4)-1))+ (cov_5*(nrow(type_5)-1))+(cov_6*(nrow(type_6)-1)))/(TOT - G)
+
+  Pi<-rep(0,G)
+  
+  Pi[1]<-nrow(type_1)/TR
+  Pi[2]<-nrow(type_2)/TR
+  Pi[3]<-nrow(type_3)/TR
+  Pi[4]<-nrow(type_4)/TR
+  Pi[5]<-nrow(type_5)/TR
+  Pi[6]<-nrow(type_6)/TR
+  
+  dfs <- rep(0, G)
+
+  storingit<-rep(0,nrow(test))
+  for(x in 1:nrow(test)){
+    for(g in 1:G){
+      dfs[g] <- mylda(test[x,1:9],Pi[g],mymu[g,],cov_all)
+    }
+    storingit[x]<-levels(test$type)[dfs == max(dfs)]
+  }
+  
+  A<- table(factor(storingit, levels =levels(test$type)), test$type)
+  
+  Totals = sum(A)
+  right<-sum(diag(A))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+  
+  #find the missclassification rate
+  missclass[i] <- rate_for_plot
+  
+  
+  index <- which(storingit == levels(test$type)[1])
+  A1 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A1)
+  right<-sum(diag(A1))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+    
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type1[i] <- rate_for_plot
+  
+  index <- which(storingit == levels(test$type)[2])
+  A2 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A2)
+  right<-sum(diag(A2))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+    
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type2[i] <- rate_for_plot
+  
+  
+  index <- which(storingit == levels(test$type)[3])
+  A3 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A3)
+  right<-sum(diag(A3))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+    
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type3[i] <- rate_for_plot
+  
+  
+  index <- which(storingit == levels(test$type)[4])
+  A4 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A4)
+  right<-sum(diag(A4))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+    
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type4[i] <- rate_for_plot
+  
+  
+  index <- which(storingit == levels(test$type)[5])
+  A5 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A5)
+  right<-sum(diag(A5))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+  
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type5[i] <- rate_for_plot
+  
+  
+  index <- which(storingit == levels(test$type)[6])
+  A6 <- table(factor(storingit[index], levels =levels(test$type[index])), test$type[index])
+  
+  Totals = sum(A6)
+  right<-sum(diag(A6))
+  not_right <- Totals-right
+  rate_for_plot <- not_right/Totals
+  
+  if (Totals == 0)
+      rate_for_plot <- 1
+  
+  #find the missclassification rate
+  missclass_type6[i] <- rate_for_plot
+  
+  
+}
+
+#Create a suitable plot to illustrate the misclassification rates for overall misclassification rates.
+plot(missclass, type="l", main = "The Misclassification Rate Overall")
+
+```
+```{r}
+#Create a suitable plot to illustrate the misclassification rates for each class
+plot(missclass_type1, type="l", main = "The Misclassification Rate for WinF")
+plot(missclass_type2, type="l", main = "The Misclassification Rate for WinNF")
+plot(missclass_type3, type="l", main = "The Misclassification Rate for Veh")
+plot(missclass_type4, type="l", main = "The Misclassification Rate for Con")
+plot(missclass_type5, type="l", main = "The Misclassification Rate for Tabl")
+plot(missclass_type6, type="l", main = "The Misclassification Rate for Head")
+```
+
+After 100 of repetitions, the average of overall misclassification rate is:
+```{r}
+mean(missclass)
+```
